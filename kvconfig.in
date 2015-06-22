@@ -1,0 +1,106 @@
+Channel   Kv
+{
+    suffix      kv
+    revName     ek
+    revValue    -86.7
+    current     ik
+    section     soma
+    L           20
+    diam        20
+    Ra          150
+    g_pas       0.00003334
+    v_init      -80.0
+    type        outward
+    celsius     37.0
+    conc_i      85.0
+    conc_o      3.3152396
+}
+
+Stimulus  Activation
+{
+    clamp_mode   voltage
+    type         step1
+    vhold1       -80
+    thold1       100
+    vhold2       -80:10:70
+    thold2       500
+    vhold3       -80
+    thold3       100
+    tstop        700
+}
+
+Stimulus  Inactivation
+{
+    clamp_mode   voltage
+    type         step2
+    vhold1       -80
+    thold1       100
+    vhold2       -40:10:70
+    thold2       1500
+    vhold3       30
+    thold3       50
+    vhold4       -80
+    thold4       100
+    tstop        1750
+}
+
+Stimulus  Deactivation
+{
+    clamp_mode   voltage
+    type         step2
+    vhold1       -80
+    thold1       100
+    vhold2       70
+    thold2       300
+    vhold3       -100:10:40
+    thold3       200
+    vhold4       -80
+    thold4       100
+    tstop        700
+}
+
+Stimulus  Ramp
+{
+    clamp_mode   voltage
+    type         ramp
+    vhold        -80
+    vmax          70
+    thold1       100
+    thold2       800
+    thold3       400
+    thold4       400
+    thold5       400
+    thold6       200
+    thold7       400
+    thold8       100
+    thold9       100
+    tstop        2900
+}
+
+Stimulus Inactivation_Recovery
+{
+    clamp_mode   voltage
+    type         step3
+    vhold1       -80
+    thold1       100
+    vhold2       -40:10:70
+    thold2       1500
+    vhold3       -80
+    thold3       25:25:400
+    vhold4       -40:10:70
+    thold4       150
+    vhold5       -80
+    thold5       100
+    tstop        2250
+}
+
+Stimulus APWaveform
+{
+    clamp_mode   voltage
+    type         waveform
+    file         APwaveform.dat
+    tstop        1800
+}
+
+
+

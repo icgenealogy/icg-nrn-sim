@@ -1,0 +1,56 @@
+load_file("customcode.hoc")
+load_file("map.hoc")
+load_file("vcCell.hoc")
+load_file("grph.hoc")
+load_file("configReader1.hoc")
+
+objref cell, conf, g
+cell = new vcCell()
+conf = new configReader1(confFile)
+conf.setCurrentString(suffix) // if ih current, then append "_suffix" to current name
+g    = new grph()
+cell.setconf(conf)
+cell.initConfig(suffix, conf.L.s, conf.diam.s, conf.Ra.s, conf.revName.s, conf.revValue.s, conf.g_pas.s, conf.v_init.s, conf.ctype.s, conf.celsius.s)
+if((strcmp(conf.suffix.s,"ca") == 0)) { // ||(strcmp(conf.suffix.s,"ih") == 0)) {
+    print "setting internal and external calcium concentrations"
+    cell.setCaiCao(suffix, "cai", conf.conc_i.s, "cao", conf.conc_o.s)
+} else if((strcmp(conf.suffix.s,"kv") == 0)||(strcmp(conf.suffix.s,"kca") == 0)) {
+    print "setting internal and external potassium concentrations"
+    cell.setCaiCao(suffix, "ki", conf.conc_i.s, "ko", conf.conc_o.s)
+} else if(strcmp(conf.suffix.s,"na") == 0) {
+    print "setting internal and external potassium concentrations"
+    cell.setCaiCao(suffix, "nai", conf.conc_i.s, "nao", conf.conc_o.s)
+}
+//cell.setNormalization(0)
+
+//tstop = 100
+cell.runActivationProtocol()
+g.plotmatrix(cell.tvec, cell.iData, 3)
+//cell.writeBGDataFile(traceFile, cell.vecVolt, cell.tvec, cell.iData, "act")
+cell.writeDataFile(traceFile, "act", cell.tvec, cell.vData, cell.iData)
+
+//tstop = 1750
+cell.runInactivationProtocol()
+g.plotmatrix(cell.tvec, cell.iData, 3)
+//cell.writeBGDataFile(traceFile, cell.vecVolt, cell.tvec, cell.iData, "inact")
+cell.writeDataFile(traceFile, "inact", cell.tvec, cell.vData, cell.iData)
+
+//tstop = 80
+cell.runDeactivationProtocol()
+g.plotmatrix(cell.tvec, cell.iData, 3)
+//cell.writeBGDataFile(traceFile, cell.vecVolt, cell.tvec, cell.iData, "deact")
+cell.writeDataFile(traceFile, "deact", cell.tvec, cell.vData, cell.iData)
+
+//tstop = 2900
+cell.runRampProtocol()
+g.plotmatrix(cell.tvec, cell.iData, 3)
+//cell.writeBGDataFile(traceFile, cell.vecVolt, cell.tvec, cell.iData, "ramp")
+cell.writeDataFile(traceFile, "ramp", cell.tvec, cell.vData, cell.iData)
+
+//tstop = 1800
+cell.runAPWaveformProtocol()
+g.plotmatrix(cell.tvec, cell.iData, 3)
+//cell.writeBGDataFile(traceFile, cell.vecVolt, cell.tvec, cell.iData, "ap")
+cell.writeDataFile(traceFile, "ap", cell.tvec, cell.vData, cell.iData)
+
+quit()

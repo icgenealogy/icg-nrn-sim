@@ -1,0 +1,69 @@
+begintemplate grph
+
+public  p, plotvec, plotmatrix, plotcomparison
+objref gmain, tmpList
+
+proc init(){
+    gmain       = new Graph(0)
+    tmpList     = new List()
+    gmain.view(0, 0, 700, 1, 100, 100, 600, 400)
+}
+
+
+
+//to plot x and  y vector on main graph
+//$o1 xvec, $o2 yvec, $3 color
+proc plotvec(){ localobj xvec, yvec
+    xvec = $o1
+    yvec = $o2
+    yvec.plot(gmain, xvec, $3, 2)
+    gmain.exec_menu("Keep Lines")
+    gmain.exec_menu("View = plot")
+}
+
+//to plot matrix $o1 xvec, $o2 matrix, $3 color
+proc plotmatrix(){local i, npt, nTrace localobj xvec, mat, vtmp
+    xvec    = $o1
+    mat     = $o2
+    nPt     = mat.nrow
+    nTrace  = mat.ncol
+    tmpList.remove_all()
+    for i=0, nTrace-1 {
+        vtmp  = mat.getcol(i).c
+        tmpList.append(vtmp)
+        vtmp.plot(gmain, xvec, $3, 2)
+        gmain.exec_menu("keep Lines")
+    }
+    gmain.exec_menu("View = plot")
+}
+
+//to plot comparison 
+//$o1 xvec1, $o2 mat1 experimental data, $o3 xvec2, $o4 mat model data 
+proc plotcomparison(){local i, npt, nTrace localobj xvec1, mat1, xvec2, mat2, vtmp
+    xvec1    = $o1
+    mat1     = $o2
+    xvec2    = $o3
+    mat2     = $o4
+    nPt     = mat1.nrow
+    nTrace  = mat1.ncol
+    tmpList.remove_all()
+    for i=0, nTrace-1 {
+        vtmp  = mat1.getcol(i).c
+        tmpList.append(vtmp)
+        vtmp.plot(gmain, xvec1, 2, 2)
+        gmain.exec_menu("keep Lines")
+    }
+    nPt     = mat2.nrow
+    nTrace  = mat2.ncol
+    for i=0, nTrace-1 {
+        vtmp  = mat2.getcol(i).c
+        tmpList.append(vtmp)
+        vtmp.plot(gmain, xvec2, 3, 2)
+        gmain.exec_menu("keep Lines")
+    }
+
+}
+
+
+
+endtemplate grph

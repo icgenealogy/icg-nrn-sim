@@ -1,0 +1,367 @@
+begintemplate configReader1
+
+public init, confFile, printConfFile, channel, suffix, L, diam, Ra, revName, revValue, current, section, v_init, g_pas, ctype, celsius, conc_i, conc_o, getSectionNameList, getSectionValueS, getActivationParams, getInactivationParams, getDeactivationParams, getRampParams, getSectionValueF, getTokensStr, getFileWaveformParams, getCalciumConcParams, setCurrentString
+
+objref confFile, channel, suffix, L, diam, Ra, revName, revValue, current,  g_pas, v_init, ctype, celsius, conc_i, conc_o, strList
+
+//initialization of configReader with configration file
+//Parameters 1: configFile
+proc init(){ localobj fp, sLine, sToken, strObj
+    confFile = new String()
+    confFile.s       = $s1
+    sToken           = new String()
+    strObj           = new StringFunctions()
+    channel          = new String()
+    suffix           = new String()
+    L                = new String()
+    diam             = new String() 
+    Ra               = new String() 
+    revName          = new String() 
+    revValue         = new String() 
+    current          = new String() 
+    g_pas            = new String()
+    v_init           = new String()
+    ctype            = new String()
+    celsius	     = new String()
+    conc_i	     = new String()
+    conc_o	     = new String()
+    strList          = new List()
+    
+    getSectionNameList(confFile.s, "Channel", strList)
+    print "Length of str list =", strList.count()
+    if(strList.count() != 1){
+        print "One Channel section expected in configuration file"
+    }
+
+    channel.s  =  strList.o(0).s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "suffix", sToken)
+    suffix.s    = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "revName", sToken)
+    revName.s  = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "revValue", sToken)
+    revValue.s = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "current", sToken)
+    current.s  = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "type", sToken)
+    ctype.s  = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "L", sToken)
+    L.s         = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "diam", sToken)
+    diam.s      = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "Ra", sToken)
+    Ra.s        = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "g_pas", sToken)
+    g_pas.s     = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s,  "v_init", sToken)
+    v_init.s    = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s, "celsius", sToken)
+    celsius.s   = sToken.s
+   print "Channel =", channel.s, " Suffix = ", suffix.s, revName.s, revValue.s, current.s, L.s, diam.s, Ra.s, g_pas.s, v_init.s, celsius.s
+
+    // get concentrations (cai, cao) for files that use concentration in kinetics (e.g., GHK formulation)
+    // not to be confused with internal calcium concentration values (cai) used for KCa protocol below
+    getSectionValueS(confFile.s, "Channel", channel.s, "conc_i", sToken)
+    conc_i.s = sToken.s
+    getSectionValueS(confFile.s, "Channel", channel.s, "conc_o", sToken)
+    conc_o.s = sToken.s
+
+}
+
+//This function returns parameters related to updating the calcium concentration for kca protocol
+//$1 ca_suffix, $2 camin, $3 cadca, $4 camax
+
+func getCalciumConcParams(){local i, n, ca1, ca2, ca3  localobj sToken, sList
+    sToken = new String()
+    sList = new List()
+
+    //$&1 = getSectionValueS(confFile.s, "Stimulus", "CalciumConc", "ca_suffix", sToken)
+    $&2 = getSectionValueS(confFile.s, "Stimulus", "CalciumConc", "cahold", sToken)
+    n = getTokensStr(sToken.s, ":", sList)
+    sscanf(sList.o(0).s, "%f", &ca1)
+    sscanf(sList.o(1).s, "%f", &ca2)
+    sscanf(sList.o(2).s, "%f", &ca3)
+    $&1 = ca1
+    $&2 = ca2
+    $&3 = ca3
+
+    return 1
+} 
+
+
+//This function returnes all parameters necessary for activation protocol stimulus
+//$1 vhold, $2 thold, $3 vmin, $4 vdv, $5 vmax, $6 tstim, $7 vend, $8 tend $9 tstop 
+
+func getActivationParams(){local i, n, v1, v2, v3 localobj sToken, sList 
+    sToken = new String()
+    sList  = new List()
+
+    $&1 = getSectionValueF(confFile.s, "Stimulus", "Activation",  "vhold1")
+    $&2 = getSectionValueF(confFile.s, "Stimulus", "Activation",  "thold1")
+    $&4 = getSectionValueS(confFile.s, "Stimulus", "Activation",  "vhold2", sToken)
+    //to parse string -80:10:70 into 3parts vmin, vdv, vmax
+    n  = getTokensStr(sToken.s, ":", sList)
+    sscanf(sList.o(0).s, "%f", &v1) 
+    sscanf(sList.o(1).s, "%f", &v2) 
+    sscanf(sList.o(2).s, "%f", &v3) 
+    $&3 = v1
+    $&4 = v2
+    $&5 = v3
+    $&6 = getSectionValueF(confFile.s, "Stimulus", "Activation",  "thold2")
+    $&7 = getSectionValueF(confFile.s, "Stimulus", "Activation",  "vhold3")
+    $&8 = getSectionValueF(confFile.s, "Stimulus", "Activation",  "thold3")
+    $&9 = getSectionValueF(confFile.s, "Stimulus", "Activation",  "tstop")
+    return 1 
+}
+
+
+//This function returnes all parameters necessary for Inactivation protocol stimulus
+//$1 vhold1, $2 thold1, $3 vmin, $4 vdv, $5 vmax, $6 thold2, $7 vhold3, $8 thold3 $9 vhold4 $10 thold4 $11tstop 
+func getInactivationParams(){local i, n, v1, v2, v3 localobj sToken, sList 
+    sToken = new String()
+    sList  = new List()
+    $&1 = getSectionValueF(confFile.s, "Stimulus", "Inactivation",  "vhold1")
+    $&2 = getSectionValueF(confFile.s, "Stimulus", "Inactivation",  "thold1")
+    $&4 = getSectionValueS(confFile.s, "Stimulus", "Inactivation",  "vhold2", sToken)
+    //to parse string -40:10:70 into 3parts vmin, vdv, vmax
+    n  = getTokensStr(sToken.s, ":", sList)
+    sscanf(sList.o(0).s, "%f", &v1) 
+    sscanf(sList.o(1).s, "%f", &v2) 
+    sscanf(sList.o(2).s, "%f", &v3) 
+    $&3 = v1
+    $&4 = v2
+    $&5 = v3
+    $&6 = getSectionValueF(confFile.s, "Stimulus", "Inactivation",  "thold2")
+    $&7 = getSectionValueF(confFile.s, "Stimulus", "Inactivation",  "vhold3")
+    $&8 = getSectionValueF(confFile.s, "Stimulus", "Inactivation",  "thold3")
+    $&9 = getSectionValueF(confFile.s, "Stimulus", "Inactivation",  "vhold4")
+    $&10 = getSectionValueF(confFile.s, "Stimulus", "Inactivation",  "thold4")
+    $&11 = getSectionValueF(confFile.s, "Stimulus", "Inactivation",  "tstop")
+    return 1 
+}
+
+//This function returnes all parameters necessary for Deactivation protocol stimulus
+//$1 vhold1, $2 thold1, $3 vhold2, $4 thold2, $5 vmin, $6 vdv, $7 vmax, $8 thold3, $9 vhold4 $10 thold4 $11tstop 
+func getDeactivationParams(){local i, n, v1, v2, v3 localobj sToken, sList 
+    sToken = new String()
+    sList  = new List()
+    $&1 = getSectionValueF(confFile.s, "Stimulus", "Deactivation",  "vhold1")
+    $&2 = getSectionValueF(confFile.s, "Stimulus", "Deactivation",  "thold1")
+    $&3 = getSectionValueF(confFile.s, "Stimulus", "Deactivation",  "vhold2")
+    $&4 = getSectionValueF(confFile.s, "Stimulus", "Deactivation",  "thold2")
+    $&5 = getSectionValueS(confFile.s, "Stimulus", "Deactivation",  "vhold3", sToken)
+    //to parse string -40:10:70 into 3parts vmin, vdv, vmax
+    n  = getTokensStr(sToken.s, ":", sList)
+    sscanf(sList.o(0).s, "%f", &v1) 
+    sscanf(sList.o(1).s, "%f", &v2) 
+    sscanf(sList.o(2).s, "%f", &v3) 
+    $&5 = v1
+    $&6 = v2
+    $&7 = v3
+    $&8 = getSectionValueF(confFile.s, "Stimulus", "Deactivation",  "thold3")
+    $&9 = getSectionValueF(confFile.s, "Stimulus", "Deactivation",  "vhold4")
+    $&10 = getSectionValueF(confFile.s, "Stimulus", "Deactivation",  "thold4")
+    $&11 = getSectionValueF(confFile.s, "Stimulus", "Deactivation",  "tstop")
+    return 1 
+}
+
+
+
+//This function returnes all parameters necessary for Ramp protocol stimulus
+//$1 vhold, $2 vmax, $3 thold1, $4 thold2, $5 thold3, $6 thold4, $7 thold5 $8 thold6, $9 thold7 $10 thold8 $11 thold $12 runtime
+func getRampParams(){ 
+    $&1  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "vhold")
+    $&2  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "vmax")
+    $&3  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold1")
+    $&4  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold2")
+    $&5  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold3")
+    $&6  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold4")
+    $&7  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold5")
+    $&8  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold6")
+    $&9  = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold7")
+    $&10 = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold8")
+    $&11 = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "thold9")
+    $&12 = getSectionValueF(confFile.s, "Stimulus", "Ramp",  "tstop")
+    return 1 
+}
+
+
+//This function returnes all parameters necessary for file waveform
+//$1 total time, $o2 wave filename
+func getFileWaveformParams(){local runtime  localobj sToken
+    sToken  = new String() 
+    $&1 = getSectionValueF(confFile.s, "Stimulus", "APWaveform",  "tstop")
+    $o2  = new String() 
+    getSectionValueS(confFile.s, "Stimulus", "APWaveform",  "file", sToken)
+    $o2.s = sToken.s
+    return 1 
+}
+
+
+proc setCurrentString(){
+    if( strcmp(suffix.s, "ih") == 0) {
+        print "Changing current and reversal potential names"
+        sprint(current.s, "%s_%s", current.s, $s1)
+        print "Current name changed to: ", current.s
+        sprint(revName.s, "%s_%s", revName.s, $s1)
+        print "Rev potential name changed to: ", revName.s
+    }
+}
+
+
+
+/*******************************************************************************************
+(c)
+This function returns the names of all sections of type secType
+
+Inputs  :   $s1 - BlueConfig file name with complete path. 
+            $s2 - SecType
+            $o3 - SectionNameList 
+********************************************************************************************/
+
+func getSectionNameList(){ local SecTypeFlag localobj UserFile,strtemp,strtemp1
+	UserFile = new File()
+	strtemp = new String("")
+	strtemp1 = new String("")
+	UserFile.ropen($s1)
+	SecTypeFlag = 1
+	if (UserFile.isopen == 0) {
+		printf("Error: Could not open Input Spec file: ", $s1)
+		execerror("Error: Could not open Input spec file: ", $s1)        
+		return 0
+	}
+	while(UserFile.gets(strtemp.s) >= 0){
+		sscanf(strtemp.s, "%s",strtemp1.s)        
+		if(1 == SecTypeFlag && 0 == strcmp(strtemp1.s, "{")){
+			SecTypeFlag = 0
+		} else if(0 == SecTypeFlag  && 0 == strcmp(strtemp1.s, "}")){
+			SecTypeFlag = 1
+		} else if(1 == SecTypeFlag  && 0 == strcmp(strtemp1.s, $s2)){
+			sscanf(strtemp.s, "%*s%s",strtemp1.s)
+			//print " strtemp.s = [", strtemp.s, "] strtemp1.s = [", strtemp1.s, "]"
+			$o3.append(new String(strtemp1.s))
+			while(SecTypeFlag == 0 && (UserFile.gets(strtemp.s) >= 0) ){
+				sscanf(strtemp.s, "%s",strtemp1.s)
+				if(0 == strcmp(strtemp1.s, "}")){
+					SecTypeFlag = 1
+				}
+			}
+		}
+	}
+	if( 0 == SecTypeFlag ){
+		printf("Error: Check config file for parentheses mismatch:")
+		UserFile.close()
+		return(0)
+	}
+	UserFile.close()
+	return(1) 
+}//end of getSectionNameList()
+
+
+//getTokensStr(str, substr,Empty list object to store tokens)
+func getTokensStr(){ local pos,i localobj strfun
+	strdef str1,str2
+	$o3 = new List()
+	strfun = new StringFunctions()
+	//print "\nthe string is: ", $s1
+	//print "\nthe string to search ", $s2
+	sscanf($s1,"%s",str2)
+	//print "\nthe str2 is: ", str2
+	i = 0
+	while(strfun.len(str2)>0) {
+		//print "\nthe str2 is: ", str2
+		i = i +1 
+		pos = strfun.substr(str2,$s2)
+		if(pos>=0) {
+			str1 = str2
+			strfun.left(str1,pos)
+			strfun.right(str2,pos+1)
+
+			//print "\nthe str1 is: ", str1
+			$o3.append(new String(str1))
+		} else {
+			$o3.append(new String(str2))
+			str2 =""
+		}
+		
+	}
+	return i
+}// end of GetTokensStr()
+
+
+
+// returns numeric section value
+func getSectionValueF(){ local value localobj sToken
+    sToken = new String()
+    getSectionValueS($s1, $s2, $s3, $s4, sToken)
+    sscanf(sToken.s, "%f", &value)
+    return value
+}
+
+/******************************************************************************************************
+(d)
+This functions return all the values of a parameter, inside a SectionType with the correct SectionName. All the values could be separated by spaces or tabulators.
+
+Inputs :	$s1 - BlueConfig file name
+		$s2 - SectionType 	 
+		$s3 - Section Name 	 
+		$s4 - Parameter Name
+		$o5 - Out value/es (string data type)
+Usage : getSectionValueS("BlueConfig","Stimulus","poisson1", "Lambda" ,str)
+*******************************************************************************************************/
+
+func getSectionValueS(){ local SecNameFlag,intnumber localobj UserFile,strobj,strtemp,strtemp1
+	strtemp=new String("")
+	strtemp1=new String("")
+	SecNameFlag      =  1
+	strobj = new StringFunctions()
+	UserFile = new File()
+	UserFile.ropen($s1)
+	if (UserFile.isopen == 0) {
+		printf("Error: Could not open BlueConfig file: ", $s1)
+		execerror("Error: Could not open BlueConfig file: ", $s1)        
+		return 0
+	}
+	strtemp.s = ""
+	$o5.s  = ""
+	while(UserFile.gets(strtemp.s) >= 0){            
+		sscanf(strtemp.s, "%s",strtemp1.s)
+		intnumber = strobj.substr(strtemp1.s, "#")
+		if(0 != intnumber){
+			if(1 == SecNameFlag && 0 == strcmp(strtemp1.s, "{")){
+				SecNameFlag = 0
+			}else if(0 == SecNameFlag  && 0 == strcmp(strtemp1.s, "}")){
+				SecNameFlag = 1
+			}
+			if(SecNameFlag == 1 && 0 == strcmp(strtemp1.s, $s2)){ //Check if it is of same target type            
+				sscanf(strtemp.s, "%*s%s", strtemp1.s)            
+				if(0 == strcmp(strtemp1.s, $s3)){ //check if it is of same name                  
+					while(UserFile.gets(strtemp.s)>=0){                              
+						sscanf(strtemp.s,"%s", strtemp1.s)                                                            
+						if(0 == strcmp(strtemp1.s, $s4)){
+							//print "Inside Check strtemp.s = [", strtemp.s, "]"
+							sscanf(strtemp.s,"%s%*[ |\t]%[^\n]",strtemp1.s, $o5.s)
+							//print"Working till here = ", strtemp.s , " [", $o5.s,"] strtemp1.s = [", strtemp1.s, "]"
+							UserFile.close()
+							return(1)
+						} 
+						if(0 == strcmp(strtemp1.s, "}")){
+							UserFile.close()
+							return(0)
+						}                                        
+					}
+				}
+			}
+		}
+	}    
+	if( 0 == SecNameFlag ){
+		printf("Error: Check config file for parentheses mismatch:")
+		UserFile.close()
+		return(0)
+	}
+	UserFile.close()
+}//end of getSectionValueS()
+
+
+
+
+endtemplate configReader1

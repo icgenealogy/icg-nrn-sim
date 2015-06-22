@@ -1,0 +1,102 @@
+load_file("nrngui.hoc")
+
+//function to write file in bg data format
+// $s1 : file name, $o2 : vec Vot, $o3 :ikmat 
+proc writeBGDataFile(){local j localobj fileout, tvec, strCommand, vecVolt, ikmat, trace
+    strCommand  = new String()
+    fileout     = new File() 
+    fileout.wopen($s1)
+    vecVolt     = $o2
+    tvec        = $o3
+    ikmat       = $o4
+    fileout.printf("%d\t%d\n", 1, vecVolt.size())
+    vecVolt.printf(fileout, "%f  ")
+    fileout.printf("%d\t%d\n", 1, tvec.size())
+    tvec.printf(fileout, "%f  ") 
+    fileout.printf("%d\t%d\n", ikmat.nrow, ikmat.ncol)
+    for (j=0; j<ikmat.nrow; j=j+1) {
+        trace = ikmat.getrow(j)
+        trace.printf(fileout, "%f  ")
+        fileout.printf("\n")
+        //print "volt = [", vecVolt.x[j],"] max = ", trace.max(), " nPt = ", trace.size()
+    }
+    fileout.close()
+}
+
+
+//read bgDataFile Parameters : $s1: bgfilename, $o2 vecVolt, $o3 vecTime
+obfunc readBGDataFile(){ local nrow, ncol, i,j localobj fin, strCommand, vecVolt, tVec, mat
+    print "reading data file"
+    fin  = new File()
+    fin.ropen($s1)
+    //read vecvolt    
+    nrow = fin.scanvar()
+    ncol = fin.scanvar()
+    $o2 = new Vector()
+    for(i=0; i<ncol; i=i+1){
+        $o2.append(fin.scanvar())        
+    }
+    
+    //read time 
+    nrow = fin.scanvar()
+    ncol = fin.scanvar()
+    //tVec = new Vector()
+    $o3  = new Vector()
+    for(i=0; i<ncol; i=i+1){
+        $o3.append(fin.scanvar())        
+    }
+    
+    //read data
+    nrow = fin.scanvar()
+    ncol = fin.scanvar()
+    mat = new Matrix(nrow, ncol)
+    for(i=0; i<nrow; i=i+1){
+        for(j=0; j<ncol; j=j+1){
+            mat.x[i][j] = fin.scanvar()        
+        }
+    }
+    fin.close()
+    return mat 
+}
+
+//Function to normalize a matrix between o and 1
+obfunc normalize(){local i, value, maxval localobj mat
+    mat = $o1
+    maxval = -1e99 
+    for(i=0; i<mat.ncol; i=i+1){
+        value = mat.getcol(i).max()
+        if(value > maxval) maxval = value 
+    }
+    print "Max value = ", maxval, " multiplying with =", 1.0/maxval
+    mat = mat.muls(1.0/maxval)
+    return mat
+}
+
+//Functions to get tokens in a string
+//Params 1: soruce string, 2: empty list to store tokens
+func GetTokens(){ local i, RetVal, length localobj strobj, str, Token
+    strobj  = new StringFunctions()  
+    str     = new String()     
+    Token   = new String()
+    str.s   = $s1                
+    i       = 0
+    while(1){                  
+        RetVal = 0             
+        RetVal = sscanf(str.s, "%s", Token.s)
+        if(RetVal <1) {        break              }
+        i = i+1
+        $o2.append(new String(Token.s)) 
+        RetVal = 0             
+        RetVal = strobj.substr(str.s,Token.s)
+        if(RetVal <0){         break              }
+        length = 0             
+        length = strobj.len(Token.s)    
+        strobj.right(str.s, length+RetVal )
+    }
+    return i
+}// end of GetTokens()
+
+
+
+
+

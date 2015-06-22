@@ -1,0 +1,39 @@
+load_file("nrngui.hoc")
+load_file("configReader1.hoc")
+load_file("map.hoc")
+load_file("lib.hoc")
+load_file("vcCell.hoc")
+load_file("grph.hoc")
+strdef suffix
+objref conf, cell, g
+g  = new grph()
+conf = new configReader1("kvconfig.in") 
+cell = new vcCell()
+cell.setconf(conf)
+suffix = "Kv3"
+cell.initConfig(suffix, conf.L.s, conf.diam.s, conf.Ra.s, conf.revName.s, conf.revValue.s, conf.g_pas.s, conf.v_init.s, conf.ctype.s)
+
+tstop = 700
+cell.runActivationProtocol()
+g.plotmatrix(cell.tvec, cell.vcData, 3)
+
+tstop = 1750
+cell.runInactivationProtocol()
+g.plotmatrix(cell.tvec, cell.vcData, 3)
+
+tstop = 700
+cell.runDeactivationProtocol()
+g.plotmatrix(cell.tvec, cell.vcData, 3)
+
+tstop = 2900
+cell.runRampProtocol()
+g.plotmatrix(cell.tvec, cell.vcData, 3)
+
+tstop = 1800
+cell.runAPWaveformProtocol()
+g.plotmatrix(cell.tvec, cell.vcData, 3)
+
+
+
+//quit()
+

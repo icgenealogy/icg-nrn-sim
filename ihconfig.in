@@ -1,0 +1,106 @@
+Channel   ih
+{
+    suffix      ih
+    revName     eh
+    revValue    -45
+    current     i
+    section     soma
+    L           20
+    diam        20
+    Ra          150
+    g_pas       0.00003334
+    v_init      -40.0
+    type	other
+    celsius	37.0
+    conc_i      8.1929e-5
+    conc_o      2.0
+}
+
+Stimulus  Activation
+{
+    clamp_mode   voltage
+    type         step1
+    vhold1       -40
+    thold1       100
+    vhold2       -150:10:0
+    thold2       2000
+    vhold3       -40
+    thold3       100
+    tstop        2201
+}
+
+Stimulus  Inactivation
+{
+    clamp_mode   voltage
+    type         step2
+    vhold1       -40
+    thold1       100
+    vhold2       -150:10:-40
+    thold2       1000
+    vhold3       -120
+    thold3       300
+    vhold4       -40
+    thold4       100
+    tstop        1500
+}
+
+Stimulus  Deactivation
+{
+    clamp_mode   voltage
+    type         step2
+    vhold1       -40
+    thold1       100
+    vhold2       -140
+    thold2       1500
+    vhold3       -110:10:0
+    thold3       500
+    vhold4       -40
+    thold4       400
+    tstop        2501
+}
+
+Stimulus  Ramp
+{
+    clamp_mode   voltage
+    type         ramp
+    vhold        -40
+    vmax         -160
+    thold1       100
+    thold2       800
+    thold3       400
+    thold4       400
+    thold5       400
+    thold6       200
+    thold7       400
+    thold8       100
+    thold9       100
+    tstop        2900
+}
+
+Stimulus Inactivation_Recovery
+{
+    clamp_mode   voltage
+    type         step3
+    vhold1       -40
+    thold1       100
+    vhold2       -140
+    thold2       3000
+    vhold3       -40
+    thold3       25:200:3025
+    vhold4       -140
+    thold4       200
+    vhold5       -40
+    thold5       200
+    tstop        6525
+}
+
+Stimulus APWaveform
+{
+    clamp_mode   voltage
+    type         waveform
+    file         APwaveform.dat
+    tstop        1800
+}
+
+
+

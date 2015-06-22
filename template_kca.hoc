@@ -1,0 +1,120 @@
+load_file("customcode.hoc")
+load_file("map.hoc")
+load_file("vcCell.hoc")  //load_file("vcCell_kca.hoc")
+load_file("grph.hoc")
+load_file("configReader1.hoc")
+
+objref cell, conf, g
+objref temp_iData, temp_vData, temp_caData, temp_iData_list, iData_list, temp_vData_list, vData_list, temp_caData_list, caData_list, temp_tvec, tvec_list, temp_tvec_list
+strdef str, cad_suffix, tracefile_name
+cell = new vcCell()
+conf = new configReader1(confFile)
+g    = new grph()
+cell.setconf(conf)
+cell.initConfig(suffix, conf.L.s, conf.diam.s, conf.Ra.s, conf.revName.s, conf.revValue.s, conf.g_pas.s, conf.v_init.s, conf.ctype.s, conf.celsius.s)
+cell.setCaiCao(suffix, "ki", conf.conc_i.s, "ko", conf.conc_o.s)
+cell.setNormalization(0)  // normalization of output is done later for KCa protocol
+
+cad_suffix = "CaDynamics_E2"
+cell.calciumConfig(cad_suffix) 
+camin = cadca = camax  = 0.0
+conf.getCalciumConcParams(&camin, &cadca, &camax)
+
+c = 0
+maxval_act = maxval_inact = maxval_deact = maxval_ramp = maxval_ap = -1e99
+iData_list = new List()
+vData_list = new List()
+caData_list = new List()
+tvec_list = new List()
+for (i=camin; i<=camax; i = i+cadca) {
+    temp_iData_list = new List()
+    temp_vData_list = new List()
+    temp_caData_list = new List()   
+    temp_tvec_list = new List() 
+
+    c = c + 1
+    print "Running activation protocol for ca = 10^-", i    
+    cell.setCalcium(i)    
+    
+    //tstop = 700
+    cell.runActivationProtocol()
+    maxval_act = cell.findMaxVal(cell.iData, maxval_act)
+    temp_iData_list.append(cell.iData.c())  //cell.copyMat(cell.iData, temp_iData))
+    temp_vData_list.append(cell.vData.c())
+    temp_caData_list.append(cell.caData.c())
+    temp_tvec_list.append(cell.tvec.c())
+    //g.plotmatrix(cell.tvec, cell.iData, 3)    //g.plotmatrix(cell.tvec, cell.caData, 3)
+
+    //tstop = 1750
+    cell.runInactivationProtocol()
+    maxval_inact = cell.findMaxVal(cell.iData, maxval_inact)
+    temp_iData_list.append(cell.iData.c())  //cell.copyMat(cell.iData, temp_iData))
+    temp_vData_list.append(cell.vData.c())
+    temp_tvec_list.append(cell.tvec.c())
+    //g.plotmatrix(cell.tvec, cell.iData, 3)
+
+    //tstop = 80
+    cell.runDeactivationProtocol()
+    maxval_deact = cell.findMaxVal(cell.iData, maxval_deact)
+    temp_iData_list.append(cell.iData.c())  //cell.copyMat(cell.iData, temp_iData))
+    temp_vData_list.append(cell.vData.c())
+    temp_tvec_list.append(cell.tvec.c())
+    //g.plotmatrix(cell.tvec, cell.iData, 3)
+
+    //tstop = 2900
+    cell.runRampProtocol()
+    maxval_ramp = cell.findMaxVal(cell.iData, maxval_ramp)
+    temp_iData_list.append(cell.iData.c())  //cell.copyMat(cell.iData, temp_iData)) 
+    temp_vData_list.append(cell.vData.c())
+    temp_tvec_list.append(cell.tvec.c())
+    //g.plotmatrix(cell.tvec, cell.iData, 3)
+
+    //tstop = 1800
+    cell.runAPWaveformProtocol()
+    maxval_ap = cell.findMaxVal(cell.iData, maxval_ap)
+    temp_iData_list.append(cell.iData.c())  //cell.copyMat(cell.iData, temp_iData)) 
+    temp_vData_list.append(cell.vData.c())
+    temp_tvec_list.append(cell.tvec.c())
+    //g.plotmatrix(cell.tvec, cell.iData, 3)
+
+    iData_list.append(temp_iData_list)
+    vData_list.append(temp_vData_list)
+    caData_list.append(temp_caData_list)
+    tvec_list.append(temp_tvec_list)
+
+}
+
+objref iData
+for (i=0; i < iData_list.count(); i=i+1) {
+    temp_iData = iData_list.o(i)
+    temp_vData = vData_list.o(i)
+    temp_caData = caData_list.o(i)
+    temp_tvec = tvec_list.o(i)
+
+    iData = cell.setNormalizeMax(temp_iData.o(0), maxval_act)
+    //iData = temp_iData.o(0)
+    sprint(tracefile_name, "act_%d", i+1)
+    cell.writeCaDataFile(traceFile, tracefile_name, temp_tvec.o(0), temp_vData.o(0), iData, temp_caData.o(0))
+
+    iData = cell.setNormalizeMax(temp_iData.o(1), maxval_inact)
+    //iData = temp_iData.o(1)
+    sprint(tracefile_name, "inact_%d", i+1)
+    cell.writeDataFile(traceFile, tracefile_name, temp_tvec.o(1), temp_vData.o(1), iData)
+
+    iData = cell.setNormalizeMax(temp_iData.o(2), maxval_deact)
+    //iData = temp_iData.o(2)
+    sprint(tracefile_name, "deact_%d", i+1)
+    cell.writeDataFile(traceFile, tracefile_name, temp_tvec.o(2), temp_vData.o(2), iData)
+
+    iData = cell.setNormalizeMax(temp_iData.o(3), maxval_ramp)
+    //iData = temp_iData.o(3)
+    sprint(tracefile_name, "ramp_%d", i+1)
+    cell.writeDataFile(traceFile, tracefile_name, temp_tvec.o(3), temp_vData.o(3), iData)
+
+    iData = cell.setNormalizeMax(temp_iData.o(4), maxval_ap)
+    //iData = temp_iData.o(4)
+    sprint(tracefile_name, "ap_%d", i+1)
+    cell.writeDataFile(traceFile, tracefile_name, temp_tvec.o(4), temp_vData.o(4), iData)
+}
+
+quit()

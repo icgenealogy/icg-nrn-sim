@@ -1,0 +1,797 @@
+begintemplate vcCell
+create soma
+objref vc, conf,  resultFile
+objref tvec, vvec, ivec, iData, ctype, vecVolt, featureMap, vData, this, cavec, caData
+public initConfig, runstep, runprotocol, printInfo, soma, runSimulation, analyzeResults, felConfig, setconf, runWaveformProtocol, runActivationProtocol, runInactivationProtocol, runDeactivationProtocol, runRampProtocol , runAPWaveformProtocol, calciumConfig, setCalcium, setNormalization, setCaiCao
+public tvec, vvec, ivec, cavec, vData, iData, caData, inward, writeBGDataFile, vecVolt, featureMap, getStepWaveform, writeDataFile, readDataFile, writeCaDataFile, normalize, setNormalizeMax, findMaxVal, findMinVal, copyMat 
+
+
+
+proc setconf(){
+    conf = $o1
+}
+
+//$1tstop, $2 dt, $o3 vector containing voltage waveform,  $o4 tvec, $o5 ivec, $o6 cavec
+proc runWaveformProtocol(){localobj str
+    str = new String()
+    sprint(str.s, "tstop =  %f", $1)
+    execute1(str.s)
+    vc.dur1 = $1
+    $o3.play(&vc.amp1, $2)
+    tstop = $1
+    $o4.resize(0)
+    $o5= new Vector()
+    $o4.record(&t, dt)
+    sprint(str.s, "%s.record(&soma.%s(0.5), dt)", $o5, conf.current.s) //, conf.suffix.s)
+    execute1(str.s, this)
+    //sprint(str.s, "%s.record(&soma.%s(0.5), dt)", $o6, "cai")
+    //execute1(str.s, this)
+    execute("init()")
+    execute("run()")
+}
+
+//$1
+proc runActivationProtocol(){local i, vhold1, thold1, vmin, vmax, vdv, thold2, vhold3, thold3, runtime localobj str, vWaveform, iList, vList, caList
+    iList    = new List()
+    vList    = new List()
+    caList   = new List()
+    conf.getActivationParams(&vhold1, &thold1, &vmin, &vdv, &vmax, &thold2, &vhold3, &thold3, &runtime)
+    for(i=vmin; i<=vmax; i = i+vdv) {
+        print "Running for v =", i
+        vWaveform = getStepWaveform(runtime, dt, vhold1, thold1, i, thold2, vhold3,thold3)
+        runWaveformProtocol(runtime, dt, vWaveform, tvec, ivec, cavec)
+        iList.append(ivec.c)
+        vList.append(vWaveform.c)
+        caList.append(cavec.c)
+    }
+    iData      =  new Matrix(tvec.size(), iList.count())
+    vData      =  new Matrix(tvec.size(), vList.count())
+    caData     =  new Matrix(tvec.size(), caList.count())
+    for(i=0; i<iList.count(); i=i+1){
+        iData.setcol(i, iList.o(i))
+        vData.setcol(i, vList.o(i))
+        caData.setcol(i, caList.o(i))
+    }
+    if (normalize) {
+        iData = normalizeMinMax(iData)
+        //caData = normalizeMinMax(caData)
+    }
+}
+
+
+proc runInactivationProtocol(){local i, vhold1, thold1, vmin, vmax, vdv, thold2, vhold3, thold3, vhold4, thold4, runtime localobj str, vWaveform, iList, vList
+    iList    = new List()
+    vList    = new List()
+    vecVolt.resize(0)
+    conf.getInactivationParams(&vhold1, &thold1, &vmin, &vdv, &vmax, &thold2, &vhold3, &thold3, &vhold4, &thold4, &runtime)
+    for(i=vmin; i<=vmax; i = i+vdv) {
+        print "Running for v =", i
+        vWaveform = getStepWaveform(runtime, dt, vhold1, thold1, i, thold2, vhold3, thold3, vhold4, thold4)
+        runWaveformProtocol(runtime, dt, vWaveform, tvec, ivec, cavec)
+        iList.append(ivec.c)
+        vList.append(vWaveform.c)
+        vecVolt.append(i)
+    }
+    iData     =  new Matrix(tvec.size(), iList.count())
+    vData     =  new Matrix(tvec.size(), vList.count())
+    for(i=0; i<iList.count(); i=i+1){
+        iData.setcol(i, iList.o(i))
+        vData.setcol(i, vList.o(i))
+    }
+    if (normalize) {
+        iData = normalizeMinMax(iData)
+    }
+}
+
+
+proc runDeactivationProtocol(){local i, vhold1, thold1, vhold2, thold2, vmin, vmax, vdv, thold3, vhold4, thold4, runtime localobj str, vWaveform, iList, vList
+    iList  = new List()
+    vList  = new List()
+    vecVolt.resize(0)
+    conf.getDeactivationParams(&vhold1, &thold1, &vhold2, &thold2, &vmin, &vdv, &vmax, &thold3, &vhold4, &thold4, &runtime)
+    for(i=vmin; i<=vmax; i = i+vdv) {
+        print "Running for v =", i
+        vWaveform = getStepWaveform(runtime, dt, vhold1, thold1, vhold2, thold2, i, thold3, vhold4, thold4)
+        //print "size =", vWaveform.size()
+        runWaveformProtocol(runtime, dt, vWaveform, tvec, ivec, cavec)
+        iList.append(ivec.c)
+        vList.append(vWaveform.c)
+        vecVolt.append(i)
+    }
+    iData     =  new Matrix(tvec.size(), iList.count())
+    vData      =  new Matrix(tvec.size(), vList.count())
+    for(i=0; i<iList.count(); i=i+1){
+        iData.setcol(i, iList.o(i))
+        vData.setcol(i, vList.o(i))
+    }
+    if (normalize) {
+        iData = normalizeMinMax(iData)
+    }
+}
+
+
+//procedure to run a ramp protocol
+proc runRampProtocol(){local i, vhold, vmax, thold1, thold2, thold3, thold4, thold5, thold6, thold7, thold8, thold9, runtime localobj str, vWaveform, iList, vList
+    iList  = new List()
+    vList  = new List()
+    vecVolt.resize(0)
+    conf.getRampParams(&vhold, &vmax, &thold1, &thold2, &thold3, &thold4, &thold5, &thold6, &thold7, &thold8, &thold9, &runtime)
+    vWaveform = getRampWaveform(runtime, dt, vhold, vmax, thold1, thold2, thold3, thold4, thold5, thold6, thold7, thold8, thold9)
+        print "size =", vWaveform.size()
+    runWaveformProtocol(runtime, dt, vWaveform, tvec, ivec, cavec)
+    iList.append(ivec.c)
+    vList.append(vWaveform.c)
+    vecVolt.append(vmax)
+    iData     =  new Matrix(tvec.size(), iList.count())
+    vData     =  new Matrix(tvec.size(), vList.count())
+    for(i=0; i<iList.count(); i=i+1){
+        iData.setcol(i, iList.o(i))
+        vData.setcol(i, vList.o(i))
+    }
+    if (normalize) {
+        iData = normalizeMinMax(iData)
+    }
+}
+
+//procedure to run a ramp protocol
+proc runAPWaveformProtocol(){local i, runtime localobj str, vWaveform,  iList, vList
+    str      = new String()
+    iList  = new List()
+    vList  = new List()
+    vecVolt.resize(0)
+    conf.getFileWaveformParams(&runtime, str)
+    vWaveform = getFileWaveform(runtime, dt, str.s) 
+        //print "size =", vWaveform.size()
+    runWaveformProtocol(runtime, dt, vWaveform, tvec, ivec, cavec)
+    iList.append(ivec.c)
+    vList.append(vWaveform.c)
+    vecVolt.append(10)
+    iData     =  new Matrix(tvec.size(), iList.count())
+    vData     =  new Matrix(tvec.size(), vList.count())
+    for(i=0; i<iList.count(); i=i+1){
+        iData.setcol(i, iList.o(i))
+        vData.setcol(i, vList.o(i))
+    }
+    if (normalize) {
+        iData = normalizeMinMax(iData)
+    }
+}
+
+
+//returns waveform containing in a file
+//$1 runtime  $2 dt $s3 filename 
+obfunc getFileWaveform(){local n localobj vecWaveform, tmpvec, fp, xvec, yvec, xdvec, ydvec
+    vecWaveform = new Vector()
+    xvec        = new Vector()
+    yvec        = new Vector()
+    ydvec       = new Vector()
+    xdvec       = new Vector()
+    totaltime = $1
+    tstep = $2
+    xdvec.indgen(0, totaltime, tstep)
+    fp  = new File()
+    fp.ropen($s3)
+    while(!fp.eof()){
+        xvec.append(fp.scanvar())
+        yvec.append(fp.scanvar())
+    }
+    ydvec = yvec.c.interpolate(xdvec, xvec)
+    return ydvec
+}
+
+
+
+//returns ramp waveform containing any number of steps
+//$1 runtime  $2 dt $3 vhold $4 vmax $5 thold1 $6 thold2 $7 thold3, $8 thold4, $9 thold5, $10 thold6, $11 thold7, $12 thold8, $13 thold9 
+obfunc getRampWaveform(){local i, narg, totaltime, tstep, vstep, thold, vhold, vmax, tdur localobj vecWaveform, tmpvec
+    vecWaveform = new Vector()
+    tmpvec      = new Vector()
+    totaltime = $1
+    narg  = numarg()
+    tstep = $2
+    vhold = $3
+    vmax  = $4
+    for (i=5; i<=narg; i=i+1){
+        if(i%2 != 0){
+           thold = $i
+           tmpvec.resize(thold/tstep)
+           tmpvec.fill(vhold)
+           vecWaveform.append(tmpvec)
+        }else {
+           tdur = $i/2
+           tmpvec.resize((tdur/tstep)-1)
+           vstep = (vmax - vhold)/tmpvec.size()
+           tmpvec.indgen(vhold, vmax, vstep)
+           vecWaveform.append(tmpvec)
+           tmpvec.indgen( vmax, vhold, -vstep)
+           vecWaveform.append(tmpvec)
+        }
+    }
+    return vecWaveform
+}
+
+
+
+
+
+//returns step waveform containing any number of steps
+//$1 tstop $2 dt $3 v1 $4 t1 $5 v2 $6 t2 
+obfunc getStepWaveform(){local i,j, totaltime, tstep, narg, vstep, tdur localobj vecWaveform, tmpvec
+    vecWaveform = new Vector()
+    tmpvec      = new Vector()
+    narg = numarg()
+    totaltime = $1
+    tstep = $2
+    //dirty logic to access both variable at the  same time
+    for (i=3; i<=narg; i=i+1) {
+        if(i%2 != 0) {
+           vstep = $i
+        }else {
+           tdur = $i
+           tmpvec.resize(tdur/tstep)
+           tmpvec.fill(vstep)
+           print "tmpvec.size = ", tmpvec.size(), " max=", tmpvec.max(), " min=", tmpvec.min()
+           vecWaveform.append(tmpvec)
+        }
+    }
+    vecWaveform.append(vstep)
+    return vecWaveform
+}
+
+
+//$s1 suffix, $s2 L, $s3 diam, $s4 Ra, $s5 revName (ek, ena, eca, eh), $s6 revValue, $s7 g_pas, $s8 v_init, $s8, $s9 ctype, $s10 celsius
+proc initConfig(){local execVal localobj str, cmdStr
+
+    str         =   new String()
+    ctype       =   new String()
+    access soma
+    execute("nseg    =   1")
+    execute("insert   pas")
+    vc      =   new SEClamp(0.5)
+    
+    // SET CONFIG PARAMETERS
+    sprint(str.s, "insert  %s", $s1)  // insert suffix
+    execVal = execute1(str.s) 
+    if(execVal == 0){
+        system("touch coredump.txt")
+        quit()
+    }
+    execute(str.s)
+    sprint(str.s, "L   =  %s",  $s2)
+    execute(str.s) 
+    sprint(str.s, "diam=  %s",  $s3)
+    execute(str.s) 
+    sprint(str.s, "Ra  =  %s",  $s4)
+    execute1(str.s) 
+    sprint(str.s, "%s  =  %s",  $s5, $s6)  // revname = revValue
+    execVal = execute1(str.s)
+    if(execVal == 0){
+        system("touch coredump.txt")
+        quit()
+    }
+    sprint(str.s, "g_pas=  %s", $s7)
+    execute(str.s) 
+    sprint(str.s, "v_init=  %s", $s8)
+    execute(str.s) 
+    ctype.s  = $s9
+    sprint(str.s, "celsius= %s", $s10)
+    execute(str.s)
+
+    // INITIALIZE VECTORS TO STORE OUTPUT DATA
+    ivec = new Vector()
+    tvec = new Vector() 
+    vvec = new Vector() 
+    cavec = new Vector()
+    vecVolt = new Vector()
+    featureMap  = new map()
+    setNormalization(1)
+}
+
+proc setCaiCao(){localobj str
+    str = new String()
+    access soma
+    sprint(str.s, "%s = %s", $s2, $s3)
+    execute(str.s)
+    print str.s
+    sprint(str.s, "%s = %s", $s4, $s5)
+    print str.s
+    execute(str.s)
+}
+
+//function to write file in bg data format
+// $s1 : file name, $o2 : vec Vot, $o3 timevec, $o4 :ikmat, [$s5 file_extension] 
+proc writeBGDataFile(){local j localobj fileout, tvec, strCommand, vecVolt, ikmat, trace, strExt, strFileName
+    strExt      = new String()
+    strCommand  = new String()
+    strFileName = new String()
+    fileout     = new File() 
+    if(numarg()> 4){
+        strExt.s = $s5
+    }
+    sprint(strFileName.s, "%s.%s",$s1,strExt.s)
+    fileout.wopen(strFileName.s)
+    vecVolt     = $o2
+    tvec        = $o3
+    ikmat       = $o4
+    fileout.printf("%d\t%d\n", 1, vecVolt.size())
+    vecVolt.printf(fileout, "%f  ")
+    fileout.printf("%d\t%d\n", 1, tvec.size())
+    tvec.printf(fileout, "%f  ") 
+    fileout.printf("%d\t%d\n", ikmat.nrow, ikmat.ncol)
+    for (j=0; j<ikmat.nrow; j=j+1) {
+        trace = ikmat.getrow(j)
+        trace.printf(fileout, "%f  ")
+        fileout.printf("\n")
+        //print "volt = [", vecVolt.x[j],"] max = ", trace.max(), " nPt = ", trace.size()
+    }
+    fileout.close()
+}
+
+// $s1: fileName, $s2: protcol_type, $o3 tvec, $o4 vMatrix, $o5 iMatrix 
+proc writeDataFile(){ local j localobj fileoutI, fileoutV, tvec, strFileNameI, strFileNameV, imat, vmat
+    vmat = new Matrix($o4.nrow(), $o4.ncol()+1)
+    imat = new Matrix($o5.nrow(), $o5.ncol()+1)
+    strFileNameI = new String()
+    strFileNameV = new String()
+    sprint(strFileNameI.s, "%s_%s.i", $s1, $s2)
+    sprint(strFileNameV.s, "%s_%s.v", $s1, $s2)
+    fileoutI = new File()
+    fileoutV = new File()
+    fileoutI.wopen(strFileNameI.s)
+    fileoutV.wopen(strFileNameV.s)
+    vmat.setcol(0, $o3)
+    imat.setcol(0, $o3)
+    for (j = 0; j<$o4.ncol(); j = j+1) {
+        vmat.setcol(j+1, $o4.getcol(j))
+        imat.setcol(j+1, $o5.getcol(j))
+    }
+    vmat.fprint(0, fileoutV, "%g\t")
+    imat.fprint(0, fileoutI, "%g\t")
+    fileoutI.close()
+    fileoutV.close()
+}
+
+// $s1: fileName, $s2: protocol_type, $o3
+obfunc  readDataFile(){ local i, nRow, nCol localobj imat, imat2,  strList, iFile, vFile, strLine, strFileNameI, strFileNameV
+    strFileNameI = new String()
+    strFileNameV = new String()
+    strLine      = new String()
+    strList      = new List()
+    imat         = new Matrix(1, 1)
+    sprint(strFileNameI.s, "%s_%s.i", $s1, $s2)
+    iFile = new File()
+    iFile.ropen(strFileNameI.s)
+    i =0
+    while(iFile.gets(strLine.s) > 0){
+      i = i+1
+    }
+    nRow = i
+    nCol = GetTokens(strLine.s, strList)
+    iFile.close()
+    iFile.ropen(strFileNameI.s)
+    imat.scanf(iFile, nRow, nCol)
+    print "imat.nrow =", imat.nrow, " imat.ncol=", imat.ncol
+    $o3  = new Vector()
+    $o3  = imat.getcol(0)
+    imat2 = new Matrix(nRow, nCol-1)
+    for (i=1; i<nCol; i=i+1) {
+        imat2.setcol(i-1, imat.getcol(i))
+    }
+    return imat2
+}
+
+
+obfunc normalizeMinMax(){localobj mat, str
+    mat = $o1
+    if( strcmp(conf.ctype.s,"inward") == 0 ){
+        mat = normalizeMin(mat)
+    } else if (strcmp(conf.ctype.s,"outward") == 0){
+        mat = normalizeMax(mat)
+    } else {
+        print "IH current, finding which to use..."
+        maxval = findMaxVal(mat, -1e99)
+        minval = findMinVal(mat, 1e99)
+        if(maxval >= abs(minval)) mat = normalizeMax(mat)
+        if(maxval < abs(minval)) mat = normalizeMin(mat)
+    }
+    return mat
+}
+
+
+//Function to normalize a matrix between o and 1
+obfunc normalizeMax(){local i, value, maxval localobj mat
+    mat = $o1
+    maxval = -1e99 
+    for(i=0; i<mat.ncol; i=i+1){
+        value = mat.getcol(i).max()
+        if(value > maxval) maxval = value 
+    }
+    print "Max value = ", maxval, " multiplying with =", 1.0/maxval
+    if(maxval > 0){
+      mat = mat.muls(1.0/maxval)
+    }
+    return mat
+}
+
+//Function to normalize a matrix between o and 1
+obfunc normalizeMin(){local i, value, minval localobj mat
+    mat = $o1
+    minval = 1e99 
+    for(i=0; i<mat.ncol; i=i+1){
+        value = mat.getcol(i).min()
+        if(value < minval) minval = value 
+    }
+    print "Min value = ", minval, " multiplying with =", 1.0/minval
+    mat = mat.muls(1.0/minval)
+    return mat
+}
+
+func findMaxVal(){local i, value, maxval localobj mat
+    mat = $o1
+    maxval = $2
+    for(i=0; i<mat.ncol; i=i+1){
+        value = mat.getcol(i).max()
+        if(value > maxval) maxval = value 
+    }
+    return maxval
+}
+
+func findMinVal(){local i, value, minval localobj mat
+    mat = $o1
+    minval = $2
+    for(i=0; i<mat.ncol; i=i+1){
+        value = mat.getcol(i).min()
+        if(value < minval) minval = value
+    }
+    return minval
+}
+
+// Normalize matrix to a user-specified value, $o1 mat, $2 maxval
+obfunc setNormalizeMax(){local maxval localobj mat
+    mat = $o1
+    maxval = $2
+    mat = mat.muls(1.0/maxval)
+    return mat
+}
+
+//Functions to get tokens in a string
+//Params 1: soruce string, 2: empty list to store tokens
+func GetTokens(){ local i, RetVal, length localobj strobj, str, Token
+    strobj  = new StringFunctions()  
+    str     = new String()     
+    Token   = new String()
+    str.s   = $s1                
+    i       = 0
+    while(1){                  
+        RetVal = 0             
+        RetVal = sscanf(str.s, "%s", Token.s)
+        if(RetVal <1) {        break              }
+        i = i+1
+        $o2.append(new String(Token.s)) 
+        RetVal = 0             
+        RetVal = strobj.substr(str.s,Token.s)
+        if(RetVal <0){         break              }
+        length = 0             
+        length = strobj.len(Token.s)    
+        strobj.right(str.s, length+RetVal )
+    }
+    return i
+}// end of GetTokens()
+
+
+
+//run simulation as per given in 
+//$1 = dt, $s2 featureFile
+func runSimulation(){local totalError, mean, std, value, minV, maxV, tstop, thold, vhold, tstim, volt, i, j  localobj str, cmdStr, vecList,  tmpVec, stimsVec, stimeVec, vMeanStd, tmpList, str1, fpFeature 
+    str         = new String()
+    str1         = new String()
+    cmdStr      = new String()
+    vecList     = new List()
+    tmpList     = new List()
+    vecVolt.clear()
+    tmpVec      = new Vector()
+    stimsVec    = new Vector(1)
+    stimeVec    = new Vector(1)
+    vMeanStd    = new Vector(2)
+    featureMap.clear()
+    conf.getConfigParam("minV", str)
+    sscanf(str.s, "%f", &minV)
+    conf.getConfigParam("maxV", str)
+    sscanf(str.s, "%f", &maxV)
+    conf.getConfigParam("tstop", str)
+    sscanf(str.s, "%f", &tstop)
+    conf.getConfigParam("thold", str)
+    sscanf(str.s, "%f", &thold)
+    conf.getConfigParam("vhold", str)
+    sscanf(str.s, "%f", &vhold)
+    conf.getConfigParam("tstim", str)
+    sscanf(str.s, "%f", &tstim)
+    sprint(cmdStr.s, "dt = %f", $1)
+    execute(cmdStr.s)
+    sprint(cmdStr.s, "tstop = %f", tstop)
+    execute(cmdStr.s)
+    stimsVec.x[0]   =   thold
+    stimeVec.x[0]   =   tstim + thold
+    for(volt=minV; volt<=maxV; volt = volt+10.0){
+        runprotocol(tstop, thold, vhold, tstim, volt, $1)
+        vecList.append(ivec.c)
+        vecVolt.append(volt)
+    }
+    iData      =   new Matrix(tvec.size(), vecList.count())
+    for(i=0; i<vecList.count(); i=i+1){
+        iData.setcol(i, vecList.o(i))
+    }
+    if( strcmp(ctype.s,"inward") == 0 ){
+        normalizeMin(iData)
+    } else {
+        normalizeMax(iData)
+    }
+    volt = minV
+    //print "vecList.count = ", vecList.count()
+   //print "Total Error = ", totalError
+    return totalError
+}
+
+
+// $1 tstop, $2 thold, $3 vhold, $4 tstim, $5 vstim, $6 dt  
+// $o7 tvec  $o8 ivec
+proc runprotocol(){ localobj str
+    str         = new String()
+    sprint(str.s, "dt = %f", $6)
+    execute(str.s)
+    sprint(str.s, "tstop = %f", $1)
+    execute(str.s)
+    vc.dur[0]   = $2
+    vc.amp[0]   = $3
+    vc.dur[1]   = $4
+    vc.amp[1]   = $5
+    vc.dur[2]   = $1 - ($2+$4)
+    vc.amp[2]   = $3
+    ivec.clear()
+    tvec.clear()
+    vvec.clear()
+    ivec.record(&soma.ik(0.5), dt)
+    tvec.record(&t, dt)
+    vvec.record(&soma.v(0.5), dt)
+    //print "runnign simulaiton volt = ", $5
+    execute("init()")
+    execute("run()")
+//    $o7 = tvec.c()
+//    $o8 = ivec.c()
+    //print "tvec size =", tvec.size(), " ivec.size =", ivec.size() 
+}
+
+
+//run simulation as per given in 
+//$1 = dt, $s2 featureFile
+func runSimulation2(){local totalError, mean, std, value, minV, maxV, tstop, thold, vhold, tstim1, volt, tstim2, volt2, i, j  localobj str, cmdStr, vecList,  tmpVec, stimsVec, stimeVec, vMeanStd, tmpList, str1, fpFeature 
+    fpFeature   = new File() 
+    fpFeature.wopen($s2)
+    str         = new String()
+    str1         = new String()
+    cmdStr      = new String()
+    vecList     = new List()
+    tmpList     = new List()
+    vecVolt.clear()
+    tmpVec      = new Vector()
+    stimsVec    = new Vector(1)
+    stimeVec    = new Vector(1)
+    vMeanStd    = new Vector(2)
+    featureMap.clear()
+    conf.getConfigParam("minV", str)
+    sscanf(str.s, "%f", &minV)
+    conf.getConfigParam("maxV", str)
+    sscanf(str.s, "%f", &maxV)
+    conf.getConfigParam("tstop", str)
+    sscanf(str.s, "%f", &tstop)
+    conf.getConfigParam("thold", str)
+    sscanf(str.s, "%f", &thold)
+    conf.getConfigParam("vhold", str)
+    sscanf(str.s, "%f", &vhold)
+    conf.getConfigParam("tstim1", str)
+    sscanf(str.s, "%f", &tstim1)
+    conf.getConfigParam("tstim2", str)
+    sscanf(str.s, "%f", &tstim2)
+    conf.getConfigParam("volt2", str)
+    sscanf(str.s, "%f", &volt2)
+    sprint(cmdStr.s, "dt = %f", $1)
+    execute(cmdStr.s)
+    sprint(cmdStr.s, "tstop = %f", tstop)
+    execute(cmdStr.s)
+    stimsVec.x[0]   =   thold
+    stimeVec.x[0]   =   tstim1 + tstim2 + thold
+    for(volt=minV; volt<=maxV; volt = volt+10.0){
+        runprotocol2(tstop, thold, vhold, tstim1, volt, tstim2, volt2, $1)
+        vecList.append(ivec.c)
+        vecVolt.append(volt)
+    }
+    iData      =   new Matrix(tvec.size(), vecList.count())
+    for(i=0; i<vecList.count(); i=i+1){
+        iData.setcol(i, vecList.o(i))
+    }
+    if( strcmp(ctype.s,"inward") == 0 ){
+        normalizeMin(iData)
+    } else {
+        normalizeMax(iData)
+    }
+    volt = minV
+     //print "Total Error = ", totalError
+    return totalError
+}
+
+
+// $1 tstop, $2 thold, $3 vhold, $4 tstim1, $5 vstim1, $6 tstim2, $7 vstim2,
+// $8 dt, $o9 tvec, $o10 ivec
+proc runprotocol2(){ localobj str
+    str         = new String()
+    sprint(str.s, "dt = %f", $8)
+    execute(str.s)
+    sprint(str.s, "tstop = %f", $1)
+    execute(str.s)
+    vc.dur[0]   = $2
+    vc.amp[0]   = $3
+    vc.dur[1]   = $4
+    vc.amp[1]   = $5
+    vc.dur[2]   = $6
+    vc.amp[2]   = $7
+    vc.dur[3]   = $1 - ($2+$4+$6)
+    vc.amp[3]   = $3
+    ivec.clear()
+    tvec.clear()
+    vvec.clear()
+    ivec.record(&soma.ik(0.5), dt)
+    tvec.record(&t, dt)
+    vvec.record(&soma.v(0.5), dt)
+    //print "runnign simulaiton volt = ", $5
+    execute("init()")
+    execute("run()")
+//    $o7 = tvec.c()
+//    $o8 = ivec.c()
+    //print "tvec size =", tvec.size(), " ivec.size =", ivec.size() 
+}
+
+
+// $1 tstop, $2 thold, $3 vhold, $4 tstim, $5 vstim, $6 dt  
+// $o7 tvec  $o8 ivec
+proc runstep(){ localobj str
+    str         = new String()
+    sprint(str.s, "dt = %f", $6)
+    execute(str.s)
+    sprint(str.s, "tstop = %f", $1)
+    execute(str.s)
+    vc.dur[0]   = $2
+    vc.amp[0]   = $3
+    vc.dur[1]   = $4
+    vc.amp[1]   = $5
+    vc.dur[2]   = $1 - ($2+$4)
+    vc.amp[2]   = $3
+    ivec.clear()
+    tvec.clear()
+    vvec.clear()
+    ivec.record(&soma.ik(0.5), dt)
+    tvec.record(&t, dt)
+    vvec.record(&soma.v(0.5), dt)
+    //print "runnign simulaiton volt = ", $5
+    execute("init()")
+    execute("run()")
+    $o7 = tvec.c()
+    $o8 = ivec.c()
+    //print "tvec size =", tvec.size(), " ivec.size =", ivec.size() 
+}
+
+
+
+
+
+//$s1 result file
+
+proc analyzeResults(){local i, paramValue, totalError localobj cmdStr, resultFile, fp, str, tmpList, paramName
+
+    resultFile   = new String()
+    str          = new String()
+    cmdStr       = new String()
+    paramName    = new String()
+    tmpList      = new List()
+    resultFile.s = $s1
+    fp           = new File()
+    fp.ropen(resultFile.s)
+    while(fp.gets(str.s) > 0){
+        tmpList.remove_all()
+        GetTokens(str.s, tmpList)
+        //print str.s
+        for(i=0; i<conf.inParamsLine.count(); i=i+1){
+            sscanf(conf.inParamsLine.o(i).s, "%s", paramName.s)
+            sscanf(tmpList.o(i+2).s, "%f", &paramValue)
+            sprint(cmdStr.s, "\t%s = %f", paramName.s, paramValue)
+            execute(cmdStr.s)
+            //print cmdStr.s
+        }
+        totalError = runSimulation(0.025)
+        print "TotalError = ",tmpList.o(0).s, "[o],",totalError, "[n]" 
+    }
+}
+
+
+proc printInfo(){
+    print " size of ivec = ", ivec.size(), " tvecsize =", tvec.size()
+}
+
+
+proc calciumConfig(){local execVal localobj str
+    str = new String()
+    access soma
+    sprint(str.s, "insert %s", $s1)
+    print str.s
+    execVal = execute1(str.s)
+    if (execVal == 0){
+        system("touch coredump.txt")
+        quit()
+    }
+}
+
+// NOTE input argument for calcium concentration is in LOG10 value
+proc setCalcium(){local cai, execVal localobj str
+    str = new String()
+    cai = 10^(-1*$1)
+    access soma
+    sprint(str.s, "cai0_CaDynamics_E2 = %f", cai)
+    //sprint(str.s, "cai = %f", cai)
+    execVal = execute1(str.s)
+    if (execVal == 0){
+        system("touch coredump.txt")
+        quit()
+    }
+}
+
+// $s1: fileName, $s2: protcol_type, $o3 tvec, $o4 vMatrix, $o5 iMatrix, $o6 caMatrix 
+proc writeCaDataFile(){ local j localobj fileoutI, fileoutV, fileoutCa, tvec, strFileNameI, strFileNameV, strFileNameCa, imat, vmat, camat
+    vmat = new Matrix($o4.nrow(), $o4.ncol()+1)
+    imat = new Matrix($o5.nrow(), $o5.ncol()+1)
+    camat = new Matrix($o6.nrow(), $o6.ncol()+1)
+    strFileNameI = new String()
+    strFileNameV = new String()
+    strFileNameCa = new String()
+    sprint(strFileNameI.s, "%s_%s.i", $s1, $s2)
+    sprint(strFileNameV.s, "%s_%s.v", $s1, $s2)
+    sprint(strFileNameCa.s, "%s_%s.ca", $s1, $s2)
+    fileoutI = new File()
+    fileoutV = new File()
+    fileoutCa = new File()
+    fileoutI.wopen(strFileNameI.s)
+    fileoutV.wopen(strFileNameV.s)
+    fileoutCa.wopen(strFileNameCa.s)
+    vmat.setcol(0, $o3)
+    imat.setcol(0, $o3)
+    camat.setcol(0, $o3)
+    for (j = 0; j<$o4.ncol(); j = j+1) {
+        vmat.setcol(j+1, $o4.getcol(j))
+        imat.setcol(j+1, $o5.getcol(j))
+        camat.setcol(j+1, $o6.getcol(j))
+    }
+    vmat.fprint(0, fileoutV, "%g\t")
+    imat.fprint(0, fileoutI, "%g\t")
+    camat.fprint(0, fileoutCa, "%g\t")
+    fileoutI.close()
+    fileoutV.close()
+    fileoutCa.close()
+}
+
+//$1 normalization_param
+proc setNormalization(){
+    normalize = $1
+}
+
+//$o1 matrix to copy
+obfunc copyMat(){local i, j localobj mat, newmat
+    mat = $o1
+    newmat = $o2  //new Matrix(mat.nrow(), mat.ncol())
+    for (i=0; i<mat.nrow(); i=i+1) {
+        for (j=0; j<mat.ncol(); j=j+1) {
+            newmat.x[i][j] = mat.x[i][j]
+        }
+    }
+    return newmat
+}
+
+
+endtemplate vcCell
