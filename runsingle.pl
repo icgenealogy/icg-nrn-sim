@@ -21,7 +21,7 @@ $mydir = getcwd;
 $scriptBaseDir = dirname(abs_path($0));
 
 # Add custom code directory to working dir
-system("ln -s $scriptBaseDir/custom_code custom_code");
+system("ln -s $scriptBaseDir/icg-channels-customcode icg-channels-customcode");
 
 $ENV{LD_LIBRARY_PATH} .= $mydir;
 

@@ -1,0 +1,3 @@
+[submodule "icg-channels-customcode"]
+	path = icg-channels-customcode
+	url = https://github.com/icgenealogy/icg-channels-customcode

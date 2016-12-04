@@ -66,7 +66,7 @@ sub runSimulation{
     system("rm customcode.hoc");
     system("touch customcode.hoc");
     print "\nLooking for custom code '$bn': ";
-    $custom_code_name = "custom_code/customcode_" . $bn . ".hoc";
+    $custom_code_name = "icg-channels-customcode/customcode_" . $bn . ".hoc";
     if (-e $custom_code_name) {
         print "Copying custom code file in: $custom_code_name\n";
         system("cp $custom_code_name customcode.hoc");
