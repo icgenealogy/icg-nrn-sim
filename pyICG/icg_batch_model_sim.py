@@ -1,9 +1,10 @@
-# ICG PROTOCOLS - batch run through all mod files of a given directory
-# Written by William Podlaski and Christopher Currin, modified from original code (in Perl/NEURON) written by Rajnish Ranjan and William Podlaski.
-# Last modified 24.08.2016
+'''
+ICG PROTOCOLS - batch run through all mod files of a given directory
+Written by William Podlaski and Christopher Currin, modified from original code (in Perl/NEURON) written by Rajnish Ranjan and William Podlaski.
+Last modified 24.08.2016
+'''
 
-# NOTE 1: currently only tested KV ion channel models
-# NOTE 2: the mod files are located relative to this python file
+# NOTE: currently only tested KV ion channel models
 
 from __future__ import print_function
 import sys

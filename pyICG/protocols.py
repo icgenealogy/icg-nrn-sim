@@ -1,14 +1,15 @@
-# ICG PROTOCOLS - Protocol Classes
-# Written by William Podlaski and Christopher Currin. Last modified 19.08.2016
+'''
+ICG PROTOCOLS - Protocol Classes
+Written by William Podlaski and Christopher Currin. Last modified 19.08.2016
 
-# NOTE: the classes take in the neuron object 'h' as an argument. this is not necessary, will be changed.
+NOTE: the classes take in the neuron object 'h' as an argument. this is not necessary, will be changed.
 
-# Contains the following items:
-# 	1. function rename_suffix(file_path, suffix): redefines the suffix in the mod file found at <file_path> to new name in <suffix>
-#	2. parent class Protocol: defines the general methods for all ICG protocols
-#	3. child classes of Protocol: Activation, Inactivation, Deactivation, Ramp & ActionPotential
-#	4. protocol_dict: dictionary variable that returns the class. see other scripts for use
-
+Contains the following items:
+ 	1. function rename_suffix(file_path, suffix): redefines the suffix in the mod file found at <file_path> to new name in <suffix>
+	2. parent class Protocol: defines the general methods for all ICG protocols
+	3. child classes of Protocol: Activation, Inactivation, Deactivation, Ramp & ActionPotential
+	4. protocol_dict: dictionary variable that returns the class. see other scripts for use
+'''
 
 import numpy as np
 import os

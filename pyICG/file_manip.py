@@ -1,3 +1,8 @@
+'''
+Helper functions for manipulating files in python
+Written by Christopher Currin
+'''
+
 # coding=utf-8
 import os
 import shutil

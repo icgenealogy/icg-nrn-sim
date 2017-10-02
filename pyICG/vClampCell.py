@@ -1,5 +1,7 @@
-# ICG PROTOCOLS - single compartment cell
-# Written by William Podlaski and Christopher Currin. Last modified 19.08.2016
+'''
+ICG PROTOCOLS - single compartment cell
+Written by William Podlaski and Christopher Currin. Last modified 19.08.2016
+'''
 
 import numpy as np
 from nrnutils import Mechanism, Section, alias
