@@ -22,4 +22,4 @@ Again, assuming this repository is cloned under ``/tmp/icg-nrn-sim``, to run sev
 ## Notes
 
 - The script copies several files to the directory it was called from, so this should be executed from a clean working directory.
-- Currently, the mod file can not be inside the working directory you are calling the script from. It is enough to place it in a subdirectory, e.g. /tmp/work/
+- Currently, the mod file can not be inside the working directory you are calling the script from. It is enough to place it in another directory, e.g. `/tmp/modfiles`, or in a subdirectory of the working directory.
