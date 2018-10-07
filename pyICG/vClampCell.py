@@ -6,9 +6,10 @@ Written by William Podlaski and Christopher Currin. Last modified 19.08.2016
 import numpy as np
 from nrnutils import Mechanism, Section, alias
 
+diam_100um2 = np.sqrt(100/np.pi)
 
 class ICGCell(object):
-    def __init__(self, ion_type, current_type, L=20, diam=20, Ra=150, g_pas=0.00003334):
+    def __init__(self, ion_type, current_type, L=diam_100um2, diam=diam_100um2, Ra=150, g_pas=0.00003334):
         self.ion_type = ion_type
         self.current_type = current_type
         leak = Mechanism('pas', e=-65, g=g_pas)
@@ -59,5 +60,6 @@ class ICGCell(object):
         tmp_oConc = {
             'kv': 3.3152396, 'nav': 136.3753955, 'cav': 2.0, 'kca': 3.3152396, 'ih': None
         }[self.ion_type]
-        setattr(self.soma, self.iConc, tmp_iConc)
-        setattr(self.soma, self.iConc, tmp_oConc)
+        if self.ion_type != 'ih':
+            setattr(self.soma, self.iConc, tmp_iConc)
+            setattr(self.soma, self.iConc, tmp_oConc)

@@ -8,6 +8,10 @@ Last modified 24.08.2016
 
 from __future__ import print_function
 import sys
+import os
+import glob
+import argparse
+import time
 from os import listdir, remove, chdir, makedirs, close, getcwd
 from os.path import isfile, isdir, join, dirname, splitext, abspath
 import errno
@@ -100,92 +104,126 @@ def nrnivmodl(tries_left, mod_files, path=None, last_line_index=-1):
     return mod_files
 
 
-# TODO: standardise Erev
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run the ICG protocols")
+    parser.add_argument('mod_type', type=str, metavar='<mod_type>', 
+                        help='Options are kav, nav, cav, ih and kca')
+    parser.add_argument('mod_loc', type=str, metavar='<mod_loc>',
+                        help='Path to the location of the .mod file (or directory of *.mod files)')
+    parser.add_argument('results_dir', type=str, metavar='<results_dir>',
+                        help='Path to the location of output files')
 
-normalize = True        # normalize all traces between 0 and 1
-plotting = False        # plot traces
+    parser.add_argument('--constant_dt', '-t',
+                        action='store_true',
+                        default=True,
+                        help="Turns on constant time step when computing currents - default is variable dt")
+    parser.add_argument('--plotting', '-p',
+                        action='store_true',
+                        help="Plot output")
+    parser.add_argument('--normalize', '-n',
+                        action='store_true',
+                        default=False,
+                        help="Normalize output with respect to the maximum")
+    return parser.parse_args()
 
-# 1. INPUT ARGUMENTS: arg1 = ion type, arg2 = input_directory, arg3 = result_directory
-orig_directory = getcwd()
-if len(sys.argv) == 4:
-    mod_name = sys.argv[1]
-    input_directory = sys.argv[2]
-    result_directory = sys.argv[3]
-else:
-    print('\n ERROR - this script accepts 3 input arguments: <mod_name> <input_directory> <result_directory>\n')
-    sys.exit(0)
-current_type = {'kv': 'outward', 'nav': 'inward', 'cav': 'outward', 'kca': 'outward', 'ih': 'outward'}[mod_name]
+def main():
+    args = parse_args()
+    # TODO: standardise Erev
+    normalize = args.normalize        # normalize all traces between 0 and 1
+    plotting = args.plotting        # plot traces
+    mod_name = args.mod_type
+    input_directory = args.mod_loc
+    result_directory = args.results_dir
+    var_dt = not(args.constant_dt)
+    try:
+        current_type = {'kv': 'outward', 'nav': 'inward',
+                        'cav': 'outward', 'kca': 'outward',
+                        'ih': 'outward'}[mod_name]
+    except KeyError:
+        print('Incorrect argument mod_type')
+        
+    # 2. PREPARE DIR - clean up, then add all mod files and compile
+    if os.path.isdir(input_directory):
+        input_path = input_directory
+        mod_files = glob.glob(os.path.join(input_path, '*.mod'))  # should use glob instead
+    elif os.path.isfile(input_directory):
+        input_path = os.path.dirname(os.path.abspath(input_directory))
+        mod_files = [input_directory]
+    print('Processing %d mod files,' %(len(mod_files)))        
+    orig_directory = getcwd()
+    with cd(input_path):
+        unique_id = str(int(time.time()*1000))
+        folder_temp = "compiled_files_" + unique_id
+        compiled_dir = create_dir(folder_temp)
+        print(mod_files)
+        custom_files = {}
+        # python hack - copy all mod files to the directory and compile
+        # NOTE: each file is given a new name (tmpmodX.mod) and suffix (suff_X), where X is the index in list mod_files
+        for (m_idx, mpath) in enumerate(mod_files):
+            m = os.path.basename(mpath)
+            print("{} is tmpmod{}".format(m, m_idx))
+            dest_file = 'tmpmod' + str(m_idx) + '.mod'
+            new_suffix = 'suff_' + str(m_idx)
+            rename_suffix(m, join(compiled_dir, dest_file), new_suffix)
+            if isfile(abspath(join(orig_directory,'../','custom_code','customcode_'+splitext(m)[0]+'.hoc'))):
+                custom_files[m_idx] = abspath(join(orig_directory,'../','custom_code','customcode_'+splitext(m)[0]+'.hoc'))
+        with cd(compiled_dir):
+            # compile the mod files
+            mod_files = nrnivmodl(len(mod_files), mod_files)
+            # remove mode files which caused an issue
+            mod_files = [m for m in mod_files]
+            # this must be done AFTER compiling of mechanisms is complete
+            # import within the same directory as compiled mod files to have them loaded automatically into NEURON
+            from neuron import h, gui
+        print(custom_files)
 
-# 2. PREPARE DIR - clean up, then add all mod files and compile
-with cd(input_directory):
-    compiled_dir = create_dir("compiled_files")
+        # SET UP NEURON ENVIRONMENT
+        h.celsius = 37.0
+        h.finitialize(-80.0)
+        # because nrnutils has neuron import statement, these should be placed after this file's neuron import
+        from vClampCell import ICGCell
+        from protocols import protocol_dict, plotting_done, \
+            Activation, Inactivation, Deactivation, Ramp, ActionPotential
 
-    mod_files = [f for f in listdir(".") if isfile(f) and f.endswith("mod")]
-    custom_files = {}
-    # python hack - copy all mod files to the directory and compile
-    # NOTE: each file is given a new name (tmpmodX.mod) and suffix (suff_X), where X is the index in list mod_files
-    for (m_idx, m) in enumerate(mod_files):
-        print("{} is tmpmod{}".format(m, m_idx))
-        dest_file = 'tmpmod' + str(m_idx) + '.mod'
-        new_suffix = 'suff_' + str(m_idx)
-        rename_suffix(m, join(compiled_dir, dest_file), new_suffix)
-        if isfile(abspath(join(orig_directory,'../','custom_code','customcode_'+splitext(m)[0]+'.hoc'))):
-            custom_files[m_idx] = abspath(join(orig_directory,'../','custom_code','customcode_'+splitext(m)[0]+'.hoc'))
-    with cd(compiled_dir):
-        # compile the mod files
-        mod_files = nrnivmodl(len(mod_files), mod_files)
-        # remove mode files which caused an issue
-        mod_files = [m for m in mod_files]
-        # this must be done AFTER compiling of mechanisms is complete
-        # import within the same directory as compiled mod files to have them loaded automatically into NEURON
-        from neuron import h, gui
+        # 3. LOOP THROUGH AND RUN ALL MOD FILES
+        for (m_idx, m) in enumerate(mod_files):
+            print('*'*50+'\n'+'Running protocols for modfile: ', m)
+            if m is None:
+                continue
+            fname = m.replace('.mod', '')
+            new_suffix = 'suff_' + str(m_idx)
+            print('suffix =', new_suffix)
+            # create the cell and insert the ion channel conductance
+            cell = ICGCell(mod_name, current_type)
 
-    print(custom_files)
-
-    # SET UP NEURON ENVIRONMENT
-    h.celsius = 37.0
-    h.finitialize(-80.0)
-    # because nrnutils has neuron import statement, these should be placed after this file's neuron import
-    from vClampCell import ICGCell
-    from protocols import protocol_dict, plotting_done, \
-        Activation, Inactivation, Deactivation, Ramp, ActionPotential
-
-    # 3. LOOP THROUGH AND RUN ALL MOD FILES
-    for (m_idx, m) in enumerate(mod_files):
-        print('*'*50+'\n'+'Running protocols for modfile: ', m)
-        if m is None:
-            continue
-        fname = m.replace('.mod', '')
-        new_suffix = 'suff_' + str(m_idx)
-        print('suffix =', new_suffix)
-        # create the cell and insert the ion channel conductance
-        cell = ICGCell(mod_name, current_type)
-
-        # some files require custom_code: if extra hoc file exists, then run it
-        with cd(orig_directory):
-            open('../customcode.hoc', 'w').close()  # empty the file
-            if m_idx in custom_files.keys():
-                print('This mod requires additional files. Loading...')
-                copyfile(custom_files[m_idx],'../customcode.hoc')
-                h('load("../customcode.hoc")')
-
-        cell.insert_distributed_channel(new_suffix)
-
-        # loop through protocols
-        protocol_list = protocol_dict.keys()
-        for p in protocol_list:
-            print('Running protocol: ', p)
-
-            # create protocol and run
-            protocol = protocol_dict[p](h)  # should generate an instance of the correct protocol
-            protocol.clampCell(cell)  # create SEClamp attached to soma
-            protocol.run(cell)  # run the protocol
+            # some files require custom_code: if extra hoc file exists, then run it
             with cd(orig_directory):
-                protocol.saveMat(fname, result_directory)  # save voltage, current and time
+                open('../customcode.hoc', 'w').close()  # empty the file
+                if m_idx in custom_files.keys():
+                    print('This mod requires additional files. Loading...')
+                    copyfile(custom_files[m_idx],'../customcode.hoc')
+                    h('load("../customcode.hoc")')
 
-            # optional plotting
-            if plotting:  # plot each run from the matrices
-                protocol.plot()
+            cell.insert_distributed_channel(new_suffix)
 
-        rmtree('compiled_files', ignore_errors=True)
-plotting_done()
+            # loop through protocols
+            protocol_list = protocol_dict.keys()
+            for p in protocol_list:
+                print('Running protocol: ', p)
+
+                # create protocol and run
+                print(var_dt)
+                protocol = protocol_dict[p](h, dt=0.0025, var_dt=var_dt)  # should generate an instance of the correct protocol
+                protocol.clampCell(cell)  # create SEClamp attached to soma
+                protocol.run(cell)  # run the protocol
+                with cd(orig_directory):
+                    protocol.saveMat(fname, result_directory)  # save voltage, current and time
+
+                # optional plotting
+                if plotting:  # plot each run from the matrices
+                    protocol.plot()
+        rmtree(folder_temp, ignore_errors=True)
+    plotting_done()
+
+if __name__ == '__main__':
+    main()
