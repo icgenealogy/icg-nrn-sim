@@ -4,7 +4,7 @@ Written by William Podlaski and Christopher Currin, modified from original code 
 Last modified 24.08.2016
 '''
 
-# NOTE: currently only tested KV ion channel models
+# NOTE: Verified and changed to run for all channel types.
 
 from __future__ import print_function
 import sys
