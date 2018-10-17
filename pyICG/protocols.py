@@ -38,12 +38,13 @@ plt.ion()
 
 
 class Protocol(object):
-    def __init__(self, h, name='protocol', tstop=0, dt=0.025, nruns=1, var_dt=True):
+    def __init__(self, h, name='protocol', tstop=0, dt=0.25, nruns=1, var_dt=True):
         super(Protocol, self).__init__()
         self.h = h
         self.name = name
         self.tstop = self.h.tstop = tstop
-        self.dt = self.h.dt = dt
+        self.dt = dt
+        self.h.dt = dt
         self.nruns = nruns
         self.totalsteps = int(round(self.tstop / self.dt)) + 1
         self.cvode = h.CVode()
@@ -85,25 +86,26 @@ class Protocol(object):
         self.t_vec.record(self.h._ref_t)
 
     def initMat(self):
-        print 'nruns =',self.nruns,', tsteps =',self.totalsteps
-        self.vMat = {} #np.zeros((self.nruns, self.totalsteps))
+        print('nruns =',self.nruns,', tsteps =',self.totalsteps)
+        #self.vMat = {} #np.zeros((self.nruns, self.totalsteps))
         self.iMat = {} #np.zeros((self.nruns, self.totalsteps))
         self.tMat = {} #np.zeros((self.nruns, self.totalsteps))
 
     def updateMat(self, idx, p=None):
         t_orig = np.array(self.t_vec.to_python())
-        v_orig = np.array(self.v_vec.to_python())
+        #v_orig = np.array(self.v_vec.to_python())
         i_orig = np.array(self.i_vec.to_python())
-        self.vMat[idx] = v_orig
-        self.iMat[idx] = i_orig
-        self.tMat[idx] = t_orig
+        #self.vMat[idx] = v_orig
+        tt = np.arange(0., self.tstop, self.dt)
+        self.iMat[idx] = np.interp(tt, t_orig, i_orig)
+        self.tMat[idx] = tt #_orig
 
     def saveMat(self, fname, path):
         create_dir(path)
         with open(os.path.join(path, fname + '_' + self.name + '.t'), 'w') as t_mat_file:
             pickle.dump(self.tMat, t_mat_file)
-        with open(os.path.join(path, fname + '_' + self.name + '.v'), 'w') as v_mat_file:
-            pickle.dump(self.vMat, v_mat_file)
+        #with open(os.path.join(path, fname + '_' + self.name + '.v'), 'w') as v_mat_file:
+        #    pickle.dump(self.vMat, v_mat_file)
         with open(os.path.join(path, fname + '_' + self.name + '.i'), 'w') as i_mat_file:
             pickle.dump(self.iMat, i_mat_file)
 

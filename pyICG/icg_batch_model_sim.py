@@ -112,11 +112,8 @@ def parse_args():
                         help='Path to the location of the .mod file (or directory of *.mod files)')
     parser.add_argument('results_dir', type=str, metavar='<results_dir>',
                         help='Path to the location of output files')
-
-    parser.add_argument('--constant_dt', '-t',
-                        action='store_true',
-                        default=True,
-                        help="Turns on constant time step when computing currents - default is variable dt")
+    parser.add_argument("-v", "--variable_dt", type=int, choices=[0, 1], 
+                        help="1 for variable time step, 0 for constant - default is 1 variable dt")
     parser.add_argument('--plotting', '-p',
                         action='store_true',
                         help="Plot output")
@@ -134,7 +131,14 @@ def main():
     mod_name = args.mod_type
     input_directory = args.mod_loc
     result_directory = args.results_dir
-    var_dt = not(args.constant_dt)
+    var_dt = args.variable_dt
+    if var_dt == 0:
+        var_dt = False
+    elif var_dt == 1:
+        var_dt = True
+    else:
+        var_dt = True
+    
     try:
         current_type = {'kv': 'outward', 'nav': 'inward',
                         'cav': 'outward', 'kca': 'outward',
@@ -210,14 +214,13 @@ def main():
             protocol_list = protocol_dict.keys()
             for p in protocol_list:
                 print('Running protocol: ', p)
-
                 # create protocol and run
-                print(var_dt)
-                protocol = protocol_dict[p](h, dt=0.0025, var_dt=var_dt)  # should generate an instance of the correct protocol
+                protocol = protocol_dict[p](h, dt=0.025, var_dt=var_dt)  # should generate an instance of the correct protocol
                 protocol.clampCell(cell)  # create SEClamp attached to soma
                 protocol.run(cell)  # run the protocol
                 with cd(orig_directory):
-                    protocol.saveMat(fname, result_directory)  # save voltage, current and time
+                    ff = fname.rsplit('/', 1)[-1]
+                    protocol.saveMat(ff, result_directory)  # save voltage, current and time
 
                 # optional plotting
                 if plotting:  # plot each run from the matrices
