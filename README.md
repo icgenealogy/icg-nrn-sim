@@ -3,18 +3,16 @@ Tool to run voltage clamp protocols in the [NEURON Simulator](http://www.neuron.
 
 ## Usage
 
-To run a single Kv mod file, create a working directory:
-```mkdir -p /tmp/work```
+Download the .zip file of this repository and save it in your local ```/tmp/``` path. Unzip the file right there and rename the ```icg-nrn-sim-master``` directory to ```icg-nrn-sim```. 
 
-Go into the working directory:
-```cd /tmp/work```
+Next, create a modfiles directory: ```mkdir -p /tmp/modfiles/``` 
 
-Then, assuming this repository is cloned under ``/tmp/icg-nrn-sim``, to run a single .mod file which is in ``/tmp/modfiles/modfile.mod`` execute the following:
+To run a single .mod file which is in ``/tmp/modfiles/modfile.mod`` execute the following:
 ```bash
 /tmp/icg-nrn-sim/runsingle.pl /tmp/modfiles/modfile.mod /tmp/icg-nrn-sim/kvconfig.in result
 ```
 
-Again, assuming this repository is cloned under ``/tmp/icg-nrn-sim``, to run several .mod files which are in ``/tmp/modfiles``,  execute the following:
+To run several .mod files which are in ``/tmp/modfiles``,  execute the following:
 ```bash
 /tmp/icg-nrn-sim/runbatch.pl /tmp/modfiles /tmp/icg-nrn-sim/kvconfig.in result
 ```
